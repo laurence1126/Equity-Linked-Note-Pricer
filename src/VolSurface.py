@@ -100,7 +100,7 @@ def gen_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: 
     plt.show()
 
 
-def local_col_transform():
+def local_vol_transform():
     pass
 
 
