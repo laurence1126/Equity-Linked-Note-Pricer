@@ -41,7 +41,7 @@ def calc_implied_total_vol(price, isCall, F, y):
 
 
 def yield_curve_interpolate():
-    basic_curve = pd.read_excel("raw_data.xlsx", sheet_name="HIBOR", header=0, index_col=0)
+    basic_curve = pd.read_excel("data/raw_data.xlsx", sheet_name="HIBOR", header=0, index_col=0)
     basic_curve = basic_curve.iloc[0, :] / 100
     basic_time = [1 / 252, 5 / 252, 15 / 252, 1 / 12, 2 / 12, 3 / 12, 6 / 12, 1]
     cs = CubicSpline(basic_time, basic_curve)
@@ -93,11 +93,12 @@ if __name__ == "__main__":
         func = partial(calc_implied_total_vol, price=price, isCall=True, F=F)
         return func(y=y)
 
-
-    delta_y = 1e-20*y
-    dw_dy = (partial_calc_implied_total_vol(y=y+delta_y) - partial_calc_implied_total_vol(y=y-delta_y))/(2*delta_y)
-    d2w_dy2 = (partial_calc_implied_total_vol(y=y+delta_y) - 2*partial_calc_implied_total_vol(y=y) + partial_calc_implied_total_vol(y=y-delta_y))/(delta_y**2)
+    delta_y = 1e-20 * y
+    dw_dy = (partial_calc_implied_total_vol(y=y + delta_y) - partial_calc_implied_total_vol(y=y - delta_y)) / (2 * delta_y)
+    d2w_dy2 = (
+        partial_calc_implied_total_vol(y=y + delta_y) - 2 * partial_calc_implied_total_vol(y=y) + partial_calc_implied_total_vol(y=y - delta_y)
+    ) / (delta_y**2)
     print(dw_dy, d2w_dy2)
-    local_vol = implied_vol / (1 - y/w * dw_dy + 1/4 * (-1/4 - 1/w + y**2/w**2) * dw_dy**2 + 1/2 * d2w_dy2)
+    local_vol = implied_vol / (1 - y / w * dw_dy + 1 / 4 * (-1 / 4 - 1 / w + y**2 / w**2) * dw_dy**2 + 1 / 2 * d2w_dy2)
 
     print(local_vol)
