@@ -1,43 +1,25 @@
 import numpy as np
 import pandas as pd
-from datetime import datetime
-from scipy.interpolate import CubicSpline
-from scipy.optimize import newton
 from math import log, sqrt, exp, pi
 from scipy.stats import norm
-from functools import partial
+from scipy.optimize import newton
+from scipy.interpolate import CubicSpline
 from scipy.misc import derivative
-
-
-pd.set_option("display.max_rows", None)
-pd.set_option("display.max_columns", None)
-pd.set_option("display.expand_frame_repr", False)
-pd.set_option("display.max_colwidth", 1000)
+from functools import partial
 
 
 def bs_formula_pricer(isCall, F, y, w):
     # calc d1 and d2
     d1 = -y / sqrt(w) + sqrt(w) / 2
     d2 = d1 - sqrt(w)
-
     # calc option price
     callPrice = F * (norm.cdf(d1) - exp(y) * norm.cdf(d2))
     putPrice = F * (exp(y) * norm.cdf(-d2) - norm.cdf(-d1))
-
     # return option price
     if isCall:
         return callPrice
     else:
         return putPrice
-
-
-def calc_implied_total_vol(price, isCall, F, y):
-    # f(sig)
-    def func(w):
-        vol_partial_bs_formula = partial(bs_formula_pricer, isCall=isCall, F=F, y=y)
-        return vol_partial_bs_formula(w=w) - price
-
-    return newton(func, 0.005, tol=1e-15)
 
 
 def yield_curve_interpolate():
@@ -65,40 +47,68 @@ def dividend_yield_curve(s0, day, dividend):
     return np.array(dividend_yield)
 
 
+def calc_implied_total_vol(price, isCall, F, y):
+    # f(sig)
+    def func(w):
+        vol_partial_bs_formula = partial(bs_formula_pricer, isCall=isCall, F=F, y=y)
+        return vol_partial_bs_formula(w=w) - price
+
+    return newton(func, 0.01, tol=1e-10)
+
+
+def calc_implied_sig(S0, K, T, div, price, isCall):
+    yc = yield_curve_interpolate()
+    fc = forward_rate_curve(yc)
+    dc = dividend_yield_curve(S0, int(T * 252), div)
+
+    r = fc[: int(T * 252)]
+    q = dc[: int(T * 252)]
+    F = S0 * exp(sum(r - q) / 252)
+    y = log(K / F)
+    w = calc_implied_total_vol(price, isCall, F, y)
+    return sqrt(w / T)
+
+
+def gen_implied_sig_curve(stock_code, day):
+    option_chains = pd.read_excel("data/option_chains.xlsx", index_col=False)
+    option_chains = option_chains[(option_chains["stock_code"] == stock_code) & (option_chains["biz_days_to_maturity"] == day)]
+
+    div = 0  #! Modify
+    S0 = option_chains["spot_price"].iloc[0]
+    yc = yield_curve_interpolate()
+    fc = forward_rate_curve(yc)
+    dc = dividend_yield_curve(S0, day, div)
+    r = fc[:day]
+    q = dc[:day]
+
+    data = []
+    for _, row in option_chains.iterrows():
+        F = S0 * exp(sum(r - q) / 252)
+        y = log(row["strike"] / F)
+        if y >= 0:
+            isCall = True
+            price = row["call_price"]
+        else:
+            isCall = False
+            price = row["put_price"]
+        if price != 0:
+            w = calc_implied_total_vol(price, isCall, F, y)
+            sig = sqrt(w / (day / 252))
+            data.append((y, sig))
+    print(data)
+
+
 def local_col_transform():
     pass
 
 
 if __name__ == "__main__":
-    s0 = 321.2
-    K = 275
-    T = 46 / 252
-    price = 50.18
-    d = 2.8
-    sig = 0.3061
+    gen_implied_sig_curve("700 HK", 23)
+    # dw_dy = (partial_calc_implied_total_vol(y=y + delta_y) - partial_calc_implied_total_vol(y=y - delta_y)) / (2 * delta_y)
+    # d2w_dy2 = (
+    #     partial_calc_implied_total_vol(y=y + delta_y) - 2 * partial_calc_implied_total_vol(y=y) + partial_calc_implied_total_vol(y=y - delta_y)
+    # ) / (delta_y**2)
+    # print(dw_dy, d2w_dy2)
+    # local_vol = implied_vol / (1 - y / w * dw_dy + 1 / 4 * (-1 / 4 - 1 / w + y**2 / w**2) * dw_dy**2 + 1 / 2 * d2w_dy2)
 
-    yc = yield_curve_interpolate()
-    fc = forward_rate_curve(yc)
-    dc = dividend_yield_curve(s0, int(T * 252), d)
-
-    r = fc[: int(T * 252)]
-    q = dc[: int(T * 252)]
-    F = s0 * exp(sum(r - q) / 252)
-    y = log(K / F)
-    w = calc_implied_total_vol(price, True, F, y)
-    implied_vol = w / T
-    print(w, y)
-
-    def partial_calc_implied_total_vol(y):
-        func = partial(calc_implied_total_vol, price=price, isCall=True, F=F)
-        return func(y=y)
-
-    delta_y = 1e-20 * y
-    dw_dy = (partial_calc_implied_total_vol(y=y + delta_y) - partial_calc_implied_total_vol(y=y - delta_y)) / (2 * delta_y)
-    d2w_dy2 = (
-        partial_calc_implied_total_vol(y=y + delta_y) - 2 * partial_calc_implied_total_vol(y=y) + partial_calc_implied_total_vol(y=y - delta_y)
-    ) / (delta_y**2)
-    print(dw_dy, d2w_dy2)
-    local_vol = implied_vol / (1 - y / w * dw_dy + 1 / 4 * (-1 / 4 - 1 / w + y**2 / w**2) * dw_dy**2 + 1 / 2 * d2w_dy2)
-
-    print(local_vol)
+    # print(local_vol)
