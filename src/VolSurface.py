@@ -42,7 +42,20 @@ def forward_rate_curve(yield_curve: np.array) -> np.array:
     return np.array(forward_rate_curve)
 
 
-def dividend_yield_curve(S0: float, day: int, dividend: float) -> np.array:
+def dividend_yield_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"]) -> np.array:
+    match stock_code:
+        case "700 HK":
+            S0 = 321.2
+            dividend = 2.256
+            day = 73
+        case "5 HK":
+            S0 = 59.45
+            dividend = 0.318
+            day = 104
+        case "941 HK":
+            S0 = 63.35
+            dividend = 2.53
+            day = 151
     discount_rate = yield_curve_interpolate()[day]
     dividend_yield = np.zeros(252)
     dividend_yield[day] = 252 * np.log(1 - dividend * np.exp(-discount_rate * day / 252) / S0)
@@ -58,17 +71,19 @@ def calc_implied_total_vol(price: float, isCall: bool, F: float, y: float) -> fl
 
 
 def gen_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: int):
+    # Read option data from excel
     option_chains = pd.read_excel("data/option_chains.xlsx", index_col=False)
     option_chains = option_chains[(option_chains["stock_code"] == stock_code) & (option_chains["biz_days_to_maturity"] == day)]
 
-    div = 0  #! Modify
+    # Calculate basic parameters
     S0 = option_chains["spot_price"].iloc[0]
     yc = yield_curve_interpolate()
     fc = forward_rate_curve(yc)
-    dc = dividend_yield_curve(S0, day, div)
+    dc = dividend_yield_curve(stock_code)
     r = fc[:day]
     q = dc[:day]
 
+    #  Store log moneyness-implied vol pairs in data
     data = []
     for _, row in option_chains.iterrows():
         F = S0 * exp(sum(r - q) / 252)
@@ -84,6 +99,7 @@ def gen_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: 
             data.append((y, w / (day / 252)))
     data = np.array(data)
 
+    # Fitting contentious implied vol curve
     def fitting_function(parameters, x):
         sig2_0, delta, kappa, gamma = parameters
         return sig2_0 + delta * np.tanh(x) / kappa + gamma / 2 * (np.tanh(x) / kappa) ** 2
