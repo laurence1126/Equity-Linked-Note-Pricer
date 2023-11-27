@@ -128,25 +128,28 @@ def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: in
     return local_vol
 
 
-def calc_local_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_moneyness, T) -> float:
+def calc_forward_local_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_forward_moneyness, T) -> float:
     option_chains = pd.read_excel("data/option_chains.xlsx", index_col=False)
     option_chains = option_chains[option_chains["stock_code"] == stock_code]
     day_list = option_chains["biz_days_to_maturity"].unique().tolist()[1:]
     local_vol_list = []
     for day in day_list:
-        local_vol_list.append(local_vol_transform(stock_code, day, log_moneyness))
+        local_vol_list.append(local_vol_transform(stock_code, day, log_forward_moneyness))
     cs = CubicSpline(np.array(day_list) / 252, local_vol_list)
     return cs(T)
 
 
-if __name__ == "__main__":
-    print(calc_local_vol_surface("700 HK", 0.02, 23 / 252))
-    print(local_vol_transform("700 HK", 23, 0.02))
-    # dw_dy = (partial_calc_implied_total_vol(y=y + delta_y) - partial_calc_implied_total_vol(y=y - delta_y)) / (2 * delta_y)
-    # d2w_dy2 = (
-    #     partial_calc_implied_total_vol(y=y + delta_y) - 2 * partial_calc_implied_total_vol(y=y) + partial_calc_implied_total_vol(y=y - delta_y)
-    # ) / (delta_y**2)
-    # print(dw_dy, d2w_dy2)
-    # local_vol = implied_vol / (1 - y / w * dw_dy + 1 / 4 * (-1 / 4 - 1 / w + y**2 / w**2) * dw_dy**2 + 1 / 2 * d2w_dy2)
+def calc_local_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_moneyness, T) -> float:
+    yc = yield_curve_interpolate()
+    fc = forward_rate_curve(yc)
+    dc = dividend_yield_curve(stock_code)
+    r = fc[: int(T * 252)]
+    q = dc[: int(T * 252)]
+    log_forward_moneyness = log_moneyness - sum(r - q) / 252
+    return calc_forward_local_vol_surface(stock_code, log_forward_moneyness, T)
 
-    # print(local_vol)
+
+if __name__ == "__main__":
+    print(calc_forward_local_vol_surface("700 HK", 0.02, 23 / 252))
+    print(local_vol_transform("700 HK", 23, 0.02))
+    print(calc_local_vol_surface("700 HK", 0.02, 23 / 252))
