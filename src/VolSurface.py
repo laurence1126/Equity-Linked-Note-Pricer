@@ -67,10 +67,10 @@ def calc_implied_total_vol(price: float, isCall: bool, F: float, y: float) -> fl
         vol_partial_bs_formula = partial(bs_formula_pricer, isCall=isCall, F=F, y=y)
         return vol_partial_bs_formula(w=w) - price
 
-    return newton(func, 0.01, tol=1e-10)
+    return newton(func, 0.01, tol=1e-5)
 
 
-def gen_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: int):
+def gen_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: int, log_moneyness: float):
     # Read option data from excel
     option_chains = pd.read_excel("data/option_chains.xlsx", index_col=False)
     option_chains = option_chains[(option_chains["stock_code"] == stock_code) & (option_chains["biz_days_to_maturity"] == day)]
@@ -108,19 +108,40 @@ def gen_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: 
         return sum((data[:, 1] - fitting_function(parameters, data[:, 0])) ** 2)
 
     parameters = minimize(calc_rss, np.array([0.01, 0.5, 0.5, 0.5])).x
-    moneyness = np.arange(-0.4, 0.4, 1e-5)
-    fitted = fitting_function(parameters, moneyness)
-    plt.plot(data[:, 0], data[:, 1], "o", label="Original Data")
-    plt.plot(moneyness, fitted, label="Fitted Curve")
-    plt.show()
+    # moneyness = np.arange(-0.4, 0.4, 1e-5)
+    # fitted = fitting_function(parameters, moneyness)
+    # plt.plot(data[:, 0], data[:, 1], "o", label="Original Data")
+    # plt.plot(moneyness, fitted, label="Fitted Curve")
+    # plt.show()
+    return fitting_function(parameters, log_moneyness)
 
 
-def local_vol_transform():
-    pass
+def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: int, log_moneyness: float):
+    def y_partial_implied_total_vol(y: float):
+        return partial(gen_implied_vol_curve, stock_code=stock_code, day=day)(log_moneyness=y) * (day / 252)
+
+    dw_dy = derivative(y_partial_implied_total_vol, log_moneyness, dx=1e-5)
+    d2w_dy2 = derivative(y_partial_implied_total_vol, log_moneyness, dx=1e-5, n=2)
+    w = gen_implied_vol_curve(stock_code, day, log_moneyness) * (day / 252)
+    implied_vol = w / (day / 252)
+    local_vol = implied_vol / (1 - log_moneyness / w * dw_dy + 1 / 4 * (-1 / 4 - 1 / w + log_moneyness**2 / w**2) * dw_dy**2 + 1 / 2 * d2w_dy2)
+    return local_vol
+
+
+def calc_local_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_moneyness, T) -> float:
+    option_chains = pd.read_excel("data/option_chains.xlsx", index_col=False)
+    option_chains = option_chains[option_chains["stock_code"] == stock_code]
+    day_list = option_chains["biz_days_to_maturity"].unique().tolist()[1:]
+    local_vol_list = []
+    for day in day_list:
+        local_vol_list.append(local_vol_transform(stock_code, day, log_moneyness))
+    cs = CubicSpline(np.array(day_list) / 252, local_vol_list)
+    return cs(T)
 
 
 if __name__ == "__main__":
-    gen_implied_vol_curve("700 HK", 23)
+    print(calc_local_vol_surface("700 HK", 0.02, 23 / 252))
+    print(local_vol_transform("700 HK", 23, 0.02))
     # dw_dy = (partial_calc_implied_total_vol(y=y + delta_y) - partial_calc_implied_total_vol(y=y - delta_y)) / (2 * delta_y)
     # d2w_dy2 = (
     #     partial_calc_implied_total_vol(y=y + delta_y) - 2 * partial_calc_implied_total_vol(y=y) + partial_calc_implied_total_vol(y=y - delta_y)
