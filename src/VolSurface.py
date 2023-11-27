@@ -50,7 +50,6 @@ def dividend_yield_curve(S0: float, day: int, dividend: float) -> np.array:
 
 
 def calc_implied_total_vol(price: float, isCall: bool, F: float, y: float) -> float:
-    # f(sig)
     def func(w):
         vol_partial_bs_formula = partial(bs_formula_pricer, isCall=isCall, F=F, y=y)
         return vol_partial_bs_formula(w=w) - price
