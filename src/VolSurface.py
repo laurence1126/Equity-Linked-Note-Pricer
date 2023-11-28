@@ -150,6 +150,4 @@ def calc_local_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_
 
 
 if __name__ == "__main__":
-    print(calc_forward_local_vol_surface("700 HK", 0.02, 23 / 252))
-    print(local_vol_transform("700 HK", 23, 0.02))
     print(calc_local_vol_surface("700 HK", 0.02, 23 / 252))
