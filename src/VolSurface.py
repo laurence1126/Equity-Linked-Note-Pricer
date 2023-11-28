@@ -8,6 +8,9 @@ from scipy.misc import derivative
 from functools import partial
 from matplotlib import pyplot as plt
 from typing import Literal
+import warnings
+
+warnings.filterwarnings("ignore")
 
 
 def bs_formula_pricer(isCall: bool, F: float, y: float, w: float) -> float:
@@ -67,10 +70,11 @@ def calc_implied_total_vol(price: float, isCall: bool, F: float, y: float) -> fl
         vol_partial_bs_formula = partial(bs_formula_pricer, isCall=isCall, F=F, y=y)
         return vol_partial_bs_formula(w=w) - price
 
-    return newton(func, 0.01, tol=1e-5)
+    initial_guess = 0.01
+    return newton(func, initial_guess, tol=1e-5)
 
 
-def gen_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: int, log_moneyness: float):
+def gen_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: int, log_moneyness: float | np.ndarray):
     # Read option data from excel
     option_chains = pd.read_excel("data/option_chains.xlsx", index_col=False)
     option_chains = option_chains[(option_chains["stock_code"] == stock_code) & (option_chains["biz_days_to_maturity"] == day)]
@@ -102,41 +106,41 @@ def gen_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: 
     # Fitting contentious implied vol curve
     def fitting_function(parameters, x):
         sig2_0, delta, kappa, gamma = parameters
-        return sig2_0 + delta * np.tanh(x) / kappa + gamma / 2 * (np.tanh(x) / kappa) ** 2
+        return sig2_0 + delta * np.tanh(kappa * x) / kappa + gamma / 2 * (np.tanh(kappa * x) / kappa) ** 2
 
     def calc_rss(parameters):
         return sum((data[:, 1] - fitting_function(parameters, data[:, 0])) ** 2)
 
     parameters = minimize(calc_rss, np.array([0.01, 0.5, 0.5, 0.5])).x
-    # moneyness = np.arange(-0.4, 0.4, 1e-5)
-    # fitted = fitting_function(parameters, moneyness)
-    # plt.plot(data[:, 0], data[:, 1], "o", label="Original Data")
-    # plt.plot(moneyness, fitted, label="Fitted Curve")
-    # plt.show()
     return fitting_function(parameters, log_moneyness)
 
 
-def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: int, log_moneyness: float):
-    def y_partial_implied_total_vol(y: float):
-        return partial(gen_implied_vol_curve, stock_code=stock_code, day=day)(log_moneyness=y) * (day / 252)
-
-    dw_dy = derivative(y_partial_implied_total_vol, log_moneyness, dx=1e-5)
-    d2w_dy2 = derivative(y_partial_implied_total_vol, log_moneyness, dx=1e-5, n=2)
-    w = gen_implied_vol_curve(stock_code, day, log_moneyness) * (day / 252)
-    implied_vol = w / (day / 252)
-    local_vol = implied_vol / (1 - log_moneyness / w * dw_dy + 1 / 4 * (-1 / 4 - 1 / w + log_moneyness**2 / w**2) * dw_dy**2 + 1 / 2 * d2w_dy2)
-    return local_vol
-
-
-def calc_forward_local_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_forward_moneyness, T) -> float:
-    option_chains = pd.read_excel("data/option_chains.xlsx", index_col=False)
-    option_chains = option_chains[option_chains["stock_code"] == stock_code]
-    day_list = option_chains["biz_days_to_maturity"].unique().tolist()[1:]
-    local_vol_list = []
+def calc_forward_implied_vol_surface(
+    stock_code: Literal["700 HK", "5 HK", "941 HK"], log_forward_moneyness: float | np.ndarray, T: float | np.ndarray
+) -> float:
+    day_list = [23, 46, 67, 87, 153]
+    implied_vol_curve_list = []
     for day in day_list:
-        local_vol_list.append(local_vol_transform(stock_code, day, log_forward_moneyness))
-    cs = CubicSpline(np.array(day_list) / 252, local_vol_list)
+        implied_vol_curve_list.append(gen_implied_vol_curve(stock_code, day, log_forward_moneyness))
+    cs = CubicSpline(np.array(day_list) / 252, implied_vol_curve_list)
     return cs(T)
+
+
+def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_forward_moneyness: float, T: float):
+    def partial_y(log_forward_moneyness: float):
+        return partial(calc_forward_implied_vol_surface, stock_code=stock_code, T=T)(log_forward_moneyness=log_forward_moneyness) * T
+
+    def partial_t(T: float):
+        return partial(calc_forward_implied_vol_surface, stock_code=stock_code, log_forward_moneyness=log_forward_moneyness)(T=T) * T
+
+    dw_dy = derivative(partial_y, log_forward_moneyness, dx=1e-2)
+    d2w_dy2 = derivative(partial_y, log_forward_moneyness, dx=1e-2, n=2)
+    dw_dt = derivative(partial_t, T, dx=1 / 252)
+    w = calc_forward_implied_vol_surface(stock_code, log_forward_moneyness, T) * T
+    local_vol = dw_dt / (
+        1 - log_forward_moneyness / w * dw_dy + 1 / 4 * (-1 / 4 - 1 / w + log_forward_moneyness**2 / w**2) * dw_dy**2 + 1 / 2 * d2w_dy2
+    )
+    return local_vol
 
 
 def calc_local_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_moneyness, T) -> float:
@@ -146,8 +150,23 @@ def calc_local_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_
     r = fc[: int(T * 252)]
     q = dc[: int(T * 252)]
     log_forward_moneyness = log_moneyness - sum(r - q) / 252
-    return calc_forward_local_vol_surface(stock_code, log_forward_moneyness, T)
+    return local_vol_transform(stock_code, log_forward_moneyness, T)
 
 
 if __name__ == "__main__":
-    print(calc_local_vol_surface("700 HK", 0.02, 23 / 252))
+    log_moneyness = np.arange(-0.2, 0.2, 1e-3)
+    T = np.arange(0, 0.5, 1 / 252)
+    # for t in T:
+    #     res = calc_forward_implied_vol_surface("700 HK", 0, T)
+    #     trams = local_vol_transform("700 HK", 0, T)
+    #     print(res, "->", trams)
+    # print(calc_forward_implied_vol_surface("700 HK", log_moneyness, 125 / 252))
+    fig = plt.figure(figsize=(10, 6))
+    ax = plt.axes(projection="3d")
+    x, y = np.meshgrid(log_moneyness, T)
+    ax.plot_surface(x, y, calc_forward_implied_vol_surface("700 HK", log_moneyness, T), cmap="viridis", edgecolor="none")
+    ax.set_title("Implied Vol Surface")
+    ax.set_xlabel("Log Moneyness")
+    ax.set_ylabel("Time to Maturity")
+    ax.set_zlabel("Implied Volatility")
+    plt.show()
