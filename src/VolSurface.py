@@ -28,8 +28,9 @@ def bs_formula_pricer(isCall: bool, F: float, y: float, w: float) -> float:
 
 
 def yield_curve_interpolate() -> np.array:
-    basic_curve = pd.read_excel("data/raw_data.xlsx", sheet_name="HIBOR", header=0, index_col=0)
-    basic_curve = basic_curve.iloc[0, :] / 100
+    # basic_curve = pd.read_excel("data/raw_data.xlsx", sheet_name="HIBOR", header=0, index_col=0)
+    # basic_curve = basic_curve.iloc[0, :] / 100
+    basic_curve = [i/100 for i in [5.07048, 5.28202, 5.28649, 5.37941, 5.58012, 5.64167, 5.61137, 5.58054]]
     basic_time = [1 / 252, 5 / 252, 15 / 252, 1 / 12, 2 / 12, 3 / 12, 6 / 12, 1]
     cs = CubicSpline(basic_time, basic_curve)
     ts = np.arange(0, 1, 1 / 252)
