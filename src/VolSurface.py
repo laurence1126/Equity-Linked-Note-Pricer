@@ -74,7 +74,7 @@ def calc_implied_total_vol(price: float, isCall: bool, F: float, y: float) -> fl
     return newton(func, initial_guess, tol=1e-5)
 
 
-def gen_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: int, log_moneyness: float | np.ndarray):
+def calc_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: int, log_moneyness: float | np.ndarray):
     # Read option data from excel
     option_chains = pd.read_excel("data/option_chains.xlsx", index_col=False)
     option_chains = option_chains[(option_chains["stock_code"] == stock_code) & (option_chains["biz_days_to_maturity"] == day)]
@@ -116,14 +116,27 @@ def gen_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: 
 
 
 def calc_forward_implied_vol_surface(
-    stock_code: Literal["700 HK", "5 HK", "941 HK"], log_forward_moneyness: float | np.ndarray, T: float | np.ndarray
-) -> float:
+    stock_code: Literal["700 HK", "5 HK", "941 HK"], log_moneyness: float | np.ndarray, T: float | np.ndarray
+) -> float | np.ndarray:
+    yc = yield_curve_interpolate()
+    fc = forward_rate_curve(yc)
+    dc = dividend_yield_curve(stock_code)
     day_list = [23, 46, 67, 87, 153]
     implied_vol_curve_list = []
     for day in day_list:
-        implied_vol_curve_list.append(gen_implied_vol_curve(stock_code, day, log_forward_moneyness))
+        r = fc[:day]
+        q = dc[:day]
+        log_forward_moneyness = log_moneyness - sum(r - q) / 252
+        implied_vol_curve_list.append(calc_implied_vol_curve(stock_code, day, log_forward_moneyness))
     cs = CubicSpline(np.array(day_list) / 252, implied_vol_curve_list)
     return cs(T)
+
+
+def gen_implied_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"]):
+    moneyness = np.arange(0.85, 1.15, 1e-3)
+    log_moneyness = np.log(moneyness)
+    T = np.arange(0, 0.5, 1 / 252)
+    return calc_forward_implied_vol_surface(stock_code, log_moneyness, T)
 
 
 def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_forward_moneyness: float, T: float):
@@ -154,23 +167,23 @@ def calc_local_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_
 
 
 if __name__ == "__main__":
-    log_moneyness = np.arange(-0.2, 0.2, 1e-3)
+    moneyness = np.arange(0.85, 1.15, 1e-3)
     T = np.arange(0, 0.5, 1 / 252)
     # for t in T:
     #     res = calc_forward_implied_vol_surface("700 HK", 0, T)
     #     trams = local_vol_transform("700 HK", 0, T)
     #     print(res, "->", trams)
     # print(calc_forward_implied_vol_surface("700 HK", log_moneyness, 125 / 252))
-    # fig = plt.figure(figsize=(10, 6))
-    # ax = plt.axes(projection="3d")
-    # x, y = np.meshgrid(log_moneyness, T)
-    # ax.plot_surface(x, y, calc_forward_implied_vol_surface("700 HK", log_moneyness, T), cmap="viridis", edgecolor="none")
-    # ax.set_title("Implied Vol Surface")
-    # ax.set_xlabel("Log Moneyness")
-    # ax.set_ylabel("Time to Maturity")
-    # ax.set_zlabel("Implied Volatility")
-    # plt.show()
-    for t in [23, 46, 67, 87, 153]:
-        plt.plot(log_moneyness, gen_implied_vol_curve("700 HK", t, log_moneyness))
-    plt.legend(["23", "46", "67", "87", "153"])
+    fig = plt.figure(figsize=(10, 6))
+    ax = plt.axes(projection="3d")
+    x, y = np.meshgrid(moneyness, T)
+    ax.plot_surface(x, y, gen_implied_vol_surface("700 HK"), cmap="viridis", edgecolor="none")
+    ax.set_title("Implied Vol Surface")
+    ax.set_xlabel("Moneyness")
+    ax.set_ylabel("Time to Maturity")
+    ax.set_zlabel("Implied Volatility")
     plt.show()
+    # for t in [23, 46, 67, 87, 153]:
+    #     plt.plot(log_moneyness, calc_implied_vol_curve("700 HK", t, log_moneyness))
+    # plt.legend(["23", "46", "67", "87", "153"])
+    # plt.show()
