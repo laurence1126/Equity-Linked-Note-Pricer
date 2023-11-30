@@ -5,7 +5,6 @@ from datetime import datetime
 from matplotlib import pyplot as plt
 from math import exp
 from scipy.misc import derivative
-from scipy.optimize import minimize
 from functools import partial
 from typing import Literal
 import warnings
@@ -27,29 +26,29 @@ class DupireLocalVolSurface:
         self.q = dividend_yield_curve(stock_code)
         self.total_df = self.total_df_func()
         self.total_df_with_local_vol_func()
-        print(self.total_df)
         self.vol_surface = self.local_vol_surface(moneyness=np.arange(0.7, 1.3, 0.001), maturity=np.arange(0, 0.5, 1/252))
 
-        # Create a 3D plot
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-
-        # Plot the surface
-        X = np.arange(0.7, 1.3, 0.001)
-        Y = np.arange(0, 0.5, 1/252)
-        X, Y = np.meshgrid(X, Y)
-        Z = self.vol_surface
-        ax.plot_surface(X, Y, Z, cmap='viridis')
-        ax.scatter(self.total_df['moneyness'], self.total_df['time_to_maturity'], self.total_df['dupire_local_vol'])
-
-        # Set labels and title
-        ax.set_xlabel('Moneyness')
-        ax.set_ylabel('Time')
-        ax.set_zlabel('Local Vol')
-        ax.set_title('Surface Plot')
-
-        # Display the plot
-        plt.show()
+        # # Create a 3D plot
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111, projection='3d')
+        #
+        # # Plot the surface
+        # X = np.arange(0.7, 1.3, 0.001)
+        # Y = np.arange(0, 0.5, 1/252)
+        # X, Y = np.meshgrid(X, Y)
+        # Z = self.vol_surface
+        # ax.plot_surface(X, Y, Z, cmap='viridis')
+        # ax.scatter(self.total_df['moneyness'], self.total_df['time_to_maturity'], self.total_df['dupire_local_vol'])
+        #
+        # # Set labels and title
+        # ax.set_xlabel('Moneyness')
+        # ax.set_ylabel('Time')
+        # ax.set_zlabel('Local Vol Surface')
+        # ax.set_title('Surface Plot')
+        #
+        # # Display the plot
+        # plt.title(f"{stock_code} Local Vol")
+        # plt.show()
 
     def total_df_func(self):
         df = pd.read_excel('data/option_chains.xlsx').query(f"stock_code == '{self.stock_code}' ")
@@ -61,13 +60,16 @@ class DupireLocalVolSurface:
 
     def total_df_with_local_vol_func(self):
         self.total_df['dupire_local_vol'] = self.total_df.apply(lambda row: self.local_vol_calc(strike=row.strike, expire_date=row.expire_date), axis=1)
-        self.total_df['dupire_local_vol'] = self.total_df['dupire_local_vol'].apply(lambda x: np.nan if x < 0 or x > 0.25 else x)
+        self.total_df['dupire_local_vol'] = self.total_df['dupire_local_vol'].apply(lambda x: np.nan if x <= 0 or x > 0.25 else x)
 
     def cubic_splines_of_option_price_with_respect_to_maturity(self, strike: float) -> (CubicSpline, CubicSpline):
         df = self.total_df.query(f"strike == {strike} ").copy()
         cs_call = CubicSpline(df['time_to_maturity'], df['call_price'])
         cs_put = CubicSpline(df['time_to_maturity'], df['put_price'])
-        # plt.plot(np.arange(0,0.5,0.01), cs_call(np.arange(0,0.5,0.01)))
+        # plt.plot(np.arange(0, 0.5, 0.01), cs_call(np.arange(0, 0.5, 0.01)))
+        # plt.xlabel("time to maturity")
+        # plt.ylabel("call option price")
+        # plt.title(f"{self.stock_code}, Strike = {strike}")
         # plt.show()
         return cs_call, cs_put
 
@@ -76,6 +78,9 @@ class DupireLocalVolSurface:
         cs_call = CubicSpline(df['strike'], df['call_price'])
         cs_put = CubicSpline(df['strike'], df['put_price'])
         # plt.plot(np.arange(df['strike'].min(), df['strike'].max(), 0.1), cs_call(np.arange(df['strike'].min(), df['strike'].max(), 0.1)))
+        # plt.xlabel("strike")
+        # plt.ylabel("call option price")
+        # plt.title(f"{self.stock_code}, expire_date = {expire_date.date()}")
         # plt.show()
         return cs_call, cs_put
 
@@ -89,14 +94,11 @@ class DupireLocalVolSurface:
                            dx=0.01 * time_to_maturity, n=1)
         d2c_dk2 = derivative(self.cubic_splines_of_option_price_with_respect_to_strike(expire_date)[i], strike,
                              dx=0.05 * strike, n=2)
-
         local_vol = 2 * dc_dt / strike ** 2 / d2c_dk2
         return local_vol
 
     def local_vol_curve_along_moneyness_axis(self, expire_date: datetime):
         df = self.total_df.query(f"expire_date == '{expire_date.strftime('%Y-%m-%d')}' and dupire_local_vol > 0 ").copy().reset_index(drop=True)
-        print(df)
-
         atm_vol = df.iloc[(df['moneyness'] - 1).abs().idxmin()]['dupire_local_vol']
 
         def regression_func(x, delta, kappa, half_gamma):
@@ -104,9 +106,6 @@ class DupireLocalVolSurface:
 
         x = np.array(df['forward_moneyness'])
         y = np.array(df['dupire_local_vol'])
-
-        print(x)
-        print(y)
 
         lower_bounds = [0, 0, 0]
         upper_bounds = [np.inf, np.inf, np.inf]
@@ -122,7 +121,6 @@ class DupireLocalVolSurface:
         def func(forward_moneyness):
             return partial(regression_func, delta=delta_opt, kappa=kappa_opt, half_gamma=half_gamma_opt)(x=forward_moneyness)
 
-
         return func
 
     def local_vol_surface(self, moneyness, maturity):
@@ -135,6 +133,13 @@ class DupireLocalVolSurface:
             time_to_maturity = row.time_to_maturity
             forward_moneyness = moneyness / row.growth_factor
             local_vol = self.local_vol_curve_along_moneyness_axis(expire_date)(forward_moneyness)
+
+            # plt.plot(moneyness, local_vol)
+            # plt.xlabel("moneyness")
+            # plt.ylabel("local vol")
+            # plt.title(f"{self.stock_code}, time to maturity = {round(time_to_maturity, 3)} ({expire_date.date()})")
+            # plt.show()
+
             x.append(time_to_maturity)
             y.append(local_vol)
         cs = CubicSpline(x, y)
