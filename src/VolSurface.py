@@ -30,7 +30,7 @@ def bs_formula_pricer(isCall: bool, F: float, y: float, w: float) -> float:
 def yield_curve_interpolate() -> np.array:
     # basic_curve = pd.read_excel("data/raw_data.xlsx", sheet_name="HIBOR", header=0, index_col=0)
     # basic_curve = basic_curve.iloc[0, :] / 100
-    basic_curve = [i/100 for i in [5.07048, 5.28202, 5.28649, 5.37941, 5.58012, 5.64167, 5.61137, 5.58054]]
+    basic_curve = [i / 100 for i in [5.07048, 5.28202, 5.28649, 5.37941, 5.58012, 5.64167, 5.61137, 5.58054]]
     basic_time = [1 / 252, 5 / 252, 15 / 252, 1 / 12, 2 / 12, 3 / 12, 6 / 12, 1]
     cs = CubicSpline(basic_time, basic_curve)
     ts = np.arange(0, 1, 1 / 252)
@@ -155,16 +155,6 @@ def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_for
         1 - log_forward_moneyness / w * dw_dy + 1 / 4 * (-1 / 4 - 1 / w + log_forward_moneyness**2 / w**2) * dw_dy**2 + 1 / 2 * d2w_dy2
     )
     return local_vol
-
-
-def calc_local_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_moneyness, T) -> float:
-    yc = yield_curve_interpolate()
-    fc = forward_rate_curve(yc)
-    dc = dividend_yield_curve(stock_code)
-    r = fc[: int(T * 252)]
-    q = dc[: int(T * 252)]
-    log_forward_moneyness = log_moneyness - sum(r - q) / 252
-    return local_vol_transform(stock_code, log_forward_moneyness, T)
 
 
 if __name__ == "__main__":
