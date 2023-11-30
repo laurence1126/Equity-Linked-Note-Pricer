@@ -10,6 +10,7 @@ from functools import partial
 from typing import Literal
 import warnings
 from VolSurface import dividend_yield_curve, forward_rate_curve, yield_curve_interpolate
+from scipy.optimize import curve_fit
 
 
 warnings.filterwarnings('ignore')
@@ -25,23 +26,26 @@ class DupireLocalVolSurface:
         self.r = forward_rate_curve(yield_curve_interpolate())
         self.q = dividend_yield_curve(stock_code)
         self.total_df = self.total_df_func()
-        self.vol_surface = self.local_vol_surface(moneyness=np.arange(0.85, 1.15, 0.001), maturity=np.arange(0, 0.5, 1/252))
+        self.total_df_with_local_vol_func()
+        print(self.total_df)
+        self.vol_surface = self.local_vol_surface(moneyness=np.arange(0.7, 1.3, 0.001), maturity=np.arange(0, 0.5, 1/252))
 
         # Create a 3D plot
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
         # Plot the surface
-        X = np.arange(0.85, 1.15, 0.001)
+        X = np.arange(0.7, 1.3, 0.001)
         Y = np.arange(0, 0.5, 1/252)
         X, Y = np.meshgrid(X, Y)
         Z = self.vol_surface
         ax.plot_surface(X, Y, Z, cmap='viridis')
+        ax.scatter(self.total_df['moneyness'], self.total_df['time_to_maturity'], self.total_df['dupire_local_vol'])
 
         # Set labels and title
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
+        ax.set_xlabel('Moneyness')
+        ax.set_ylabel('Time')
+        ax.set_zlabel('Local Vol')
         ax.set_title('Surface Plot')
 
         # Display the plot
@@ -55,16 +59,24 @@ class DupireLocalVolSurface:
         df['forward_moneyness'] = df.apply(lambda row: row.strike / (row.growth_factor * row.spot_price), axis=1)
         return df
 
+    def total_df_with_local_vol_func(self):
+        self.total_df['dupire_local_vol'] = self.total_df.apply(lambda row: self.local_vol_calc(strike=row.strike, expire_date=row.expire_date), axis=1)
+        self.total_df['dupire_local_vol'] = self.total_df['dupire_local_vol'].apply(lambda x: np.nan if x < 0 or x > 0.25 else x)
+
     def cubic_splines_of_option_price_with_respect_to_maturity(self, strike: float) -> (CubicSpline, CubicSpline):
-        df = self.total_df.query(f"strike == {strike}").copy()
+        df = self.total_df.query(f"strike == {strike} ").copy()
         cs_call = CubicSpline(df['time_to_maturity'], df['call_price'])
         cs_put = CubicSpline(df['time_to_maturity'], df['put_price'])
+        # plt.plot(np.arange(0,0.5,0.01), cs_call(np.arange(0,0.5,0.01)))
+        # plt.show()
         return cs_call, cs_put
 
     def cubic_splines_of_option_price_with_respect_to_strike(self, expire_date: datetime) -> (CubicSpline, CubicSpline):
         df = self.total_df.query(f"expire_date == '{expire_date.strftime('%Y-%m-%d')}'").copy()
         cs_call = CubicSpline(df['strike'], df['call_price'])
         cs_put = CubicSpline(df['strike'], df['put_price'])
+        # plt.plot(np.arange(df['strike'].min(), df['strike'].max(), 0.1), cs_call(np.arange(df['strike'].min(), df['strike'].max(), 0.1)))
+        # plt.show()
         return cs_call, cs_put
 
     def local_vol_calc(self, strike: float, expire_date: datetime) -> float:
@@ -74,28 +86,42 @@ class DupireLocalVolSurface:
         moneyness = df['moneyness'].iloc[0]
         i = 0 if moneyness > 1 else 1
         dc_dt = derivative(self.cubic_splines_of_option_price_with_respect_to_maturity(strike)[i], time_to_maturity,
-                           dx=1e-3 * time_to_maturity, n=1)
+                           dx=0.01 * time_to_maturity, n=1)
         d2c_dk2 = derivative(self.cubic_splines_of_option_price_with_respect_to_strike(expire_date)[i], strike,
                              dx=0.05 * strike, n=2)
+
         local_vol = 2 * dc_dt / strike ** 2 / d2c_dk2
         return local_vol
 
     def local_vol_curve_along_moneyness_axis(self, expire_date: datetime):
-        df = self.total_df.query(f"expire_date == '{expire_date.strftime('%Y-%m-%d')}'").copy()
-        df = df.query("0.8 < moneyness < 1.2")
-        df['dupire_local_vol'] = df.apply(lambda row: self.local_vol_calc(strike=row.strike, expire_date=row.expire_date), axis=1)
+        df = self.total_df.query(f"expire_date == '{expire_date.strftime('%Y-%m-%d')}' and dupire_local_vol > 0 ").copy().reset_index(drop=True)
+        print(df)
 
-        def fitting_function(parameters, x):
-            sig2_0, delta, kappa, gamma = parameters
-            return sig2_0 + delta * np.tanh(kappa * x) / kappa + gamma / 2 * (np.tanh(kappa * x) / kappa) ** 2
+        atm_vol = df.iloc[(df['moneyness'] - 1).abs().idxmin()]['dupire_local_vol']
 
-        def calc_rss(parameters):
-            return sum((df['dupire_local_vol'] - fitting_function(parameters, np.log(df['forward_moneyness']))) ** 2)
+        def regression_func(x, delta, kappa, half_gamma):
+            return atm_vol + delta * np.tanh(kappa * np.log(x)) / kappa + half_gamma * (np.tanh(kappa * np.log(x)) / kappa) ** 2
 
-        parameters = minimize(calc_rss, np.array([0.01, 0.5, 0.5, 0.5])).x
+        x = np.array(df['forward_moneyness'])
+        y = np.array(df['dupire_local_vol'])
+
+        print(x)
+        print(y)
+
+        lower_bounds = [0, 0, 0]
+        upper_bounds = [np.inf, np.inf, np.inf]
+        bounds = (lower_bounds, upper_bounds)
+
+        initial_guess = [0.5, 0.5, 0.5]  # Initial guess for the parameters
+        optimized_params, _ = curve_fit(regression_func, x, y, p0=initial_guess, bounds=bounds, maxfev=10000)
+
+        delta_opt = optimized_params[0]
+        kappa_opt = optimized_params[1]
+        half_gamma_opt = optimized_params[2]
 
         def func(forward_moneyness):
-            return partial(fitting_function, parameters=parameters)(x=np.log(forward_moneyness))
+            return partial(regression_func, delta=delta_opt, kappa=kappa_opt, half_gamma=half_gamma_opt)(x=forward_moneyness)
+
 
         return func
 
@@ -104,7 +130,7 @@ class DupireLocalVolSurface:
 
         x = []
         y = []
-        for idx, row in df[1:].iterrows():
+        for idx, row in df.iterrows():
             expire_date = row.expire_date
             time_to_maturity = row.time_to_maturity
             forward_moneyness = moneyness / row.growth_factor
