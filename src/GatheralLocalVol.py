@@ -148,4 +148,3 @@ if __name__ == "__main__":
     fig.legend(["Local Vol", "Implied Vol"])
     plt.subplots_adjust(left=0, right=1)
     plt.show()
-    fig.savefig("img/local_vs_implied_combined.png")
