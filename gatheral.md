@@ -17,7 +17,7 @@ w(y, T) =
         & \ddots & \\
         & & T_{126}
     \end{bmatrix}
-    \cdot \sigma^2_{BS}(y, T)
+    \cdot \sigma^2_{BS}(y, T) \text{, where }T_{i} = \frac{i}{252}
 $$
 
 With Python Code implementation:
