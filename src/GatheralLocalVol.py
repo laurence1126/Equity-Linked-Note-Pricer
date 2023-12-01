@@ -119,7 +119,7 @@ def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], moneyne
     d2w_dy2 = derivative(partial_y, log_moneyness, dx=1e-5, n=2)
     dw_dt = derivative(partial_t, T, dx=1 / 252)
     w = np.dot(np.diag(T), calc_forward_implied_vol_surface(stock_code, log_moneyness, T, log=True))
-    log_forward_moneyness = np.array([np.log(moneyness) - sum(fc[: int(t)] - dc[: int(t)]) / 252 for t in T])
+    log_forward_moneyness = np.array([np.log(moneyness) - sum(fc[: int(t * 252)] - dc[: int(t * 252)]) / 252 for t in T])
     local_vol = dw_dt / (
         1 - log_forward_moneyness / w * dw_dy + 1 / 4 * (-1 / 4 - 1 / w + log_forward_moneyness**2 / w**2) * dw_dy**2 + 1 / 2 * d2w_dy2
     )
