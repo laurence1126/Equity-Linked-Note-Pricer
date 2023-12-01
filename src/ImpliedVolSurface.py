@@ -115,7 +115,7 @@ def calc_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day:
 
 
 def calc_forward_implied_vol_surface(
-    stock_code: Literal["700 HK", "5 HK", "941 HK"], moneyness: float | np.ndarray, T: float | np.ndarray
+    stock_code: Literal["700 HK", "5 HK", "941 HK"], moneyness: float | np.ndarray, T: float | np.ndarray, log: bool = False
 ) -> float | np.ndarray:
     yc = yield_curve_interpolate()
     fc = forward_rate_curve(yc)
@@ -125,28 +125,34 @@ def calc_forward_implied_vol_surface(
     for day in day_list:
         r = fc[:day]
         q = dc[:day]
-        log_forward_moneyness = np.log(moneyness) - sum(r - q) / 252
+        if not log:
+            log_forward_moneyness = np.log(moneyness) - sum(r - q) / 252
+        else:
+            log_forward_moneyness = moneyness - sum(r - q) / 252
         implied_vol_curve_list.append(calc_implied_vol_curve(stock_code, day, log_forward_moneyness))
     cs = CubicSpline(np.array(day_list) / 252, implied_vol_curve_list)
     return cs(T)
 
 
 def gen_implied_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"]):
+    moneyness = np.arange(0.85, 1.15, 1e-3)
     T = np.arange(0, 0.5, 1 / 252)
     return calc_forward_implied_vol_surface(stock_code, moneyness, T)
 
 
-def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_forward_moneyness: float, T: float):
+def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], moneyness: float, T: float):
+    log_forward_moneyness = np.log(moneyness)
+
     def partial_y(log_forward_moneyness: float):
-        return partial(calc_forward_implied_vol_surface, stock_code=stock_code, T=T)(log_forward_moneyness=log_forward_moneyness) * T
+        return np.dot(np.diag(T), partial(calc_forward_implied_vol_surface, stock_code=stock_code, T=T, log=True)(moneyness=log_forward_moneyness))
 
     def partial_t(T: float):
-        return partial(calc_forward_implied_vol_surface, stock_code=stock_code, log_forward_moneyness=log_forward_moneyness)(T=T) * T
+        return np.dot(np.diag(T), partial(calc_forward_implied_vol_surface, stock_code=stock_code, moneyness=log_forward_moneyness, log=True)(T=T))
 
-    dw_dy = derivative(partial_y, log_forward_moneyness, dx=1e-2)
-    d2w_dy2 = derivative(partial_y, log_forward_moneyness, dx=1e-2, n=2)
+    dw_dy = derivative(partial_y, log_forward_moneyness, dx=1e-4)
+    d2w_dy2 = derivative(partial_y, log_forward_moneyness, dx=1e-4, n=2)
     dw_dt = derivative(partial_t, T, dx=1 / 252)
-    w = calc_forward_implied_vol_surface(stock_code, log_forward_moneyness, T) * T
+    w = np.dot(np.diag(T), calc_forward_implied_vol_surface(stock_code, log_forward_moneyness, T, log=True))
     local_vol = dw_dt / (
         1 - log_forward_moneyness / w * dw_dy + 1 / 4 * (-1 / 4 - 1 / w + log_forward_moneyness**2 / w**2) * dw_dy**2 + 1 / 2 * d2w_dy2
     )
@@ -156,13 +162,14 @@ def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], log_for
 if __name__ == "__main__":
     moneyness = np.arange(0.85, 1.15, 1e-3)
     T = np.arange(0, 0.5, 1 / 252)
-    fig = plt.figure()
-    ax = plt.axes(projection="3d")
-    x, y = np.meshgrid(moneyness, T)
-    ax.plot_surface(x, y, gen_implied_vol_surface("700 HK"), cmap="viridis", edgecolor="none")
-    plt.title("700 HK Implied Vol Surface")
-    ax.set_xlabel("Moneyness")
-    ax.set_ylabel("Time to Maturity")
-    ax.set_zlabel("Implied Volatility")
-    plt.show()
-    fig.savefig("pic/700_HK_Vol_Surface.png")
+    for stock_code in ["700 HK", "5 HK", "941 HK"]:
+        fig = plt.figure()
+        ax = plt.axes(projection="3d")
+        x, y = np.meshgrid(moneyness, T)
+        ax.plot_surface(x, y, local_vol_transform(stock_code, moneyness, T), cmap="viridis", edgecolor="none")
+        ax.plot_surface(x, y, gen_implied_vol_surface(stock_code), cmap="viridis", edgecolor="none")
+        plt.title(f"{stock_code} Local Vol Surface")
+        ax.set_xlabel("Moneyness")
+        ax.set_ylabel("Time to Maturity")
+        ax.set_zlabel("Local Volatility")
+        plt.show()
