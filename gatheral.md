@@ -47,6 +47,4 @@ def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], moneyne
 ```
 
 Plots for combining the local volatility surface with the Black-Scholes implied volatility surface:
-![Alt text](pic/700_HK_Local_vs_Implied_Vol.png)
-![Alt text](pic/5_HK_Local_vs_Implied_Vol.png)
-![Alt text](pic/941_HK_Local_vs_Implied_Vol.png)
+![](img/local_vs_implied_combined.png)
