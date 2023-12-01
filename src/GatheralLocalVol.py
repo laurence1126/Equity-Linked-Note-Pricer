@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from math import log, sqrt, exp
 from scipy.stats import norm
 from scipy.optimize import newton, minimize
 from scipy.interpolate import CubicSpline
@@ -16,11 +15,11 @@ warnings.filterwarnings("ignore")
 
 def bs_formula_pricer(isCall: bool, F: float, y: float, w: float) -> float:
     # calc d1 and d2
-    d1 = -y / sqrt(w) + sqrt(w) / 2
-    d2 = d1 - sqrt(w)
+    d1 = -y / np.sqrt(w) + np.sqrt(w) / 2
+    d2 = d1 - np.sqrt(w)
     # calc option price
-    callPrice = F * (norm.cdf(d1) - exp(y) * norm.cdf(d2))
-    putPrice = F * (exp(y) * norm.cdf(-d2) - norm.cdf(-d1))
+    callPrice = F * (norm.cdf(d1) - np.exp(y) * norm.cdf(d2))
+    putPrice = F * (np.exp(y) * norm.cdf(-d2) - norm.cdf(-d1))
     # return option price
     if isCall:
         return callPrice
@@ -53,8 +52,8 @@ def calc_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day:
     #  Store log moneyness-implied vol pairs in data
     data = []
     for _, row in option_chains.iterrows():
-        F = S0 * exp(sum(r - q) / 252)
-        y = log(row["strike"] / F)
+        F = S0 * np.exp(sum(r - q) / 252)
+        y = np.log(row["strike"] / F)
         if y >= 0:
             isCall = True
             price = row["call_price"]
