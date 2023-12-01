@@ -8,7 +8,7 @@ from scipy.misc import derivative
 from functools import partial
 from typing import Literal
 import warnings
-from ImpliedVolSurface import dividend_yield_curve, forward_rate_curve, yield_curve_interpolate
+from Curves import dividend_yield_curve, forward_rate_curve, yield_curve_interpolate
 from scipy.optimize import curve_fit
 
 
