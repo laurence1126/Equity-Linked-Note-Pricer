@@ -135,9 +135,9 @@ def gen_local_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"]):
 if __name__ == "__main__":
     moneyness = np.arange(0.85, 1.15, 1e-3)
     T = np.arange(0, 0.5, 1 / 252)
+    x, y = np.meshgrid(moneyness, T)
     fig, axs = plt.subplots(1, 3, subplot_kw=dict(projection="3d"), figsize=(15, 5))
     for i, stock_code in enumerate(["700 HK", "5 HK", "941 HK"]):
-        x, y = np.meshgrid(moneyness, T)
         axs[i].plot_surface(x, y, gen_local_vol_surface(stock_code), cmap="plasma", edgecolor="none")
         axs[i].plot_surface(x, y, gen_implied_vol_surface(stock_code), cmap="viridis", edgecolor="none")
         axs[i].set_title(stock_code)
