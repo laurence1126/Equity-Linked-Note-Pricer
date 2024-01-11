@@ -38,7 +38,7 @@ def calc_implied_total_vol(price: float, isCall: bool, F: float, y: float) -> fl
 
 def calc_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: int, log_forward_moneyness: float | np.ndarray):
     # Read option data from excel
-    option_chains = pd.read_excel("data/option_chains.xlsx", index_col=False)
+    option_chains = pd.read_excel("option_chains.xlsx", index_col=False)
     option_chains = option_chains[(option_chains["stock_code"] == stock_code) & (option_chains["biz_days_to_maturity"] == day)]
 
     # Calculate basic parameters
@@ -129,15 +129,15 @@ def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], moneyne
 def gen_local_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"]):
     moneyness = np.arange(0.85, 1.15, 1e-3)
     T = np.arange(0, 0.5, 1 / 252)
-    return local_vol_transform(stock_code, moneyness, T)
+    return np.nan_to_num(local_vol_transform(stock_code, moneyness, T), nan=0)
 
 
 if __name__ == "__main__":
     moneyness = np.arange(0.85, 1.15, 1e-3)
     T = np.arange(0, 0.5, 1 / 252)
-    x, y = np.meshgrid(moneyness, T)
     fig, axs = plt.subplots(1, 3, subplot_kw=dict(projection="3d"), figsize=(15, 5))
     for i, stock_code in enumerate(["700 HK", "5 HK", "941 HK"]):
+        x, y = np.meshgrid(moneyness, T)
         axs[i].plot_surface(x, y, gen_local_vol_surface(stock_code), cmap="plasma", edgecolor="none")
         axs[i].plot_surface(x, y, gen_implied_vol_surface(stock_code), cmap="viridis", edgecolor="none")
         axs[i].set_title(stock_code)
