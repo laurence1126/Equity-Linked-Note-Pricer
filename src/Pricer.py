@@ -43,24 +43,26 @@ def stock_price(initial_price, stock_index, corr_norm, path, name, volsurface):
         s_pos[i, 0] = initial_price.get(name)
         s_neg[i, 0] = initial_price.get(name)
         s_pos[i, 1] = s_pos[i, 0] * exp(
-            (r[0] - q[0] - max(volsurface[0, int((1 - 0.85) * 1000)], 0) / 2) * (
-                    1 / 252) + sqrt(max(volsurface[0, int((1 - 0.85) * 1000)], 0)) *
-            corr_norm[stock_index.get(name), 0, i] * sqrt(1 / 252))
+            (r[0] - q[0] - max(volsurface[0, int((1 - 0.85) * 1000)], 0) / 2) * (1 / 252)
+            + sqrt(max(volsurface[0, int((1 - 0.85) * 1000)], 0)) * corr_norm[stock_index.get(name), 0, i] * sqrt(1 / 252)
+        )
         s_neg[i, 1] = s_neg[i, 0] * exp(
-            (r[0] - q[0] - max(volsurface[0, int(round(1 - 0.85, 3) * 1000)], 0) / 2) * (
-                    1 / 252) + sqrt(max(volsurface[0, int(round(1 - 0.85, 3) * 1000)], 0) / 2) *
-            (-corr_norm[stock_index.get(name), 0, i]) * sqrt(1 / 252))
+            (r[0] - q[0] - max(volsurface[0, int(round(1 - 0.85, 3) * 1000)], 0) / 2) * (1 / 252)
+            + sqrt(max(volsurface[0, int(round(1 - 0.85, 3) * 1000)], 0) / 2) * (-corr_norm[stock_index.get(name), 0, i]) * sqrt(1 / 252)
+        )
         for j in range(1, m):
             s_pos[i, j + 1] = s_pos[i, j] * exp(
                 (r[j] - q[j] - max(volsurface[j, int((round(s_pos[i, j - 1] / s_pos[i, j], 3) - 0.85) * 1000)], 0) / 2) * (1 / 252)
-                + sqrt(max(volsurface[j, int((round(s_pos[i, j - 1] / s_pos[i, j], 3) - 0.85) * 1000)], 0)) *
-                corr_norm[stock_index.get(name), j, i] * sqrt(1 / 252))
+                + sqrt(max(volsurface[j, int((round(s_pos[i, j - 1] / s_pos[i, j], 3) - 0.85) * 1000)], 0))
+                * corr_norm[stock_index.get(name), j, i]
+                * sqrt(1 / 252)
+            )
             s_neg[i, j + 1] = s_neg[i, j] * exp(
-                (r[j] - q[j] - max(volsurface[j, int((round(s_neg[i, j - 1] / s_neg[i, j], 3) - 0.85) * 1000)],
-                                   0) / 2) * (
-                        1 / 252) + sqrt(
-                    max(volsurface[j, int((round(s_neg[i, j - 1] / s_neg[i, j], 3) - 0.85) * 1000)], 0)) *
-                -corr_norm[stock_index.get(name), j, i] * sqrt(1 / 252))
+                (r[j] - q[j] - max(volsurface[j, int((round(s_neg[i, j - 1] / s_neg[i, j], 3) - 0.85) * 1000)], 0) / 2) * (1 / 252)
+                + sqrt(max(volsurface[j, int((round(s_neg[i, j - 1] / s_neg[i, j], 3) - 0.85) * 1000)], 0))
+                * -corr_norm[stock_index.get(name), j, i]
+                * sqrt(1 / 252)
+            )
     return np.concatenate((s_pos, s_neg))
 
 
@@ -71,14 +73,12 @@ def get_last_price(i, tencent, hsbc, mobile, m):
 
 def find_laggard(last_price, initial_price):
     if last_price.get("700 HK") / initial_price.get("700 HK") < last_price.get("5 HK") / initial_price.get("5 HK"):
-        if last_price.get("700 HK") / initial_price.get("700 HK") < last_price.get("941 HK") / initial_price.get(
-                "941 HK"):
+        if last_price.get("700 HK") / initial_price.get("700 HK") < last_price.get("941 HK") / initial_price.get("941 HK"):
             return "700 HK"
         else:
             return "941 HK"
     if last_price.get("700 HK") / initial_price.get("700 HK") > last_price.get("5 HK") / initial_price.get("5 HK"):
-        if last_price.get("700 HK") / initial_price.get("700 HK") > last_price.get("941 HK") / initial_price.get(
-                "941 HK"):
+        if last_price.get("700 HK") / initial_price.get("700 HK") > last_price.get("941 HK") / initial_price.get("941 HK"):
             return "941 HK"
         else:
             return "5 HK"
@@ -118,7 +118,7 @@ def get_note_price(path, tencent, hsbc, mobile, initial_price, pr, m):
         LAGGARD = find_laggard(LAST_PRICE, initial_price)
         SCENARIO = decide_scenario(LAGGARD, LAST_PRICE, initial_price)
         summation = summation + redeem(SCENARIO[1], pr, LAST_PRICE, initial_price, SCENARIO[0])
-    return 1 / (2 * path) * summation*exp(-0.0561137*0.5)
+    return 1 / (2 * path) * summation * exp(-0.0561137 * 0.5)
 
 
 def run_pricer(title: str, surfaces: list):
@@ -136,10 +136,10 @@ def run_pricer(title: str, surfaces: list):
         prices.append(price)
         print(pr, price)
         if round(price / 10000, 3) == 0.98:
-            plt.plot(pr, price, 'ro')
+            plt.plot(pr, price, "ro")
             point = (pr, price)
             pr_tar = pr
-    plt.annotate(f"Desired PR is: {round(pr_tar, 2)}", point, (2.25, 9800), arrowprops={'arrowstyle': "->"})
+    plt.annotate(f"Desired PR is: {round(pr_tar, 2)}", point, (2.25, 9800), arrowprops={"arrowstyle": "->"})
     plt.plot(np.arange(2, 2.5, 0.01), prices)
     plt.xlabel("PR")
     plt.ylabel("Note Price")
@@ -147,7 +147,7 @@ def run_pricer(title: str, surfaces: list):
     plt.show()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     tencent_impliedvol_surface = gen_implied_vol_surface(stock_code="700 HK")
     hsbc_impliedvol_surface = gen_implied_vol_surface(stock_code="5 HK")
@@ -157,13 +157,13 @@ if __name__ == '__main__':
     hsbc_constvol_surface = np.full(hsbc_impliedvol_surface.shape, 0.09)
     mobile_constvol_surface = np.full(mobile_impliedvol_surface.shape, 0.09)
 
-    tencent_gatheral_localvol_surface = gen_local_vol_surface(stock_code='700 HK')
-    hsbc_gatheral_localvol_surface = gen_local_vol_surface(stock_code='5 HK')
-    mobile_gatheral_localvol_surface = gen_local_vol_surface(stock_code='941 HK')
+    tencent_gatheral_localvol_surface = gen_local_vol_surface(stock_code="700 HK")
+    hsbc_gatheral_localvol_surface = gen_local_vol_surface(stock_code="5 HK")
+    mobile_gatheral_localvol_surface = gen_local_vol_surface(stock_code="941 HK")
 
-    tencent_dupire_localvol_surface = DupireLocalVolSurface(stock_code='700 HK').vol_surface
-    hsbc_dupire_localvol_surface = DupireLocalVolSurface(stock_code='5 HK').vol_surface
-    mobile_dupire_localvol_surface = DupireLocalVolSurface(stock_code='941 HK').vol_surface
+    tencent_dupire_localvol_surface = DupireLocalVolSurface(stock_code="700 HK").vol_surface
+    hsbc_dupire_localvol_surface = DupireLocalVolSurface(stock_code="5 HK").vol_surface
+    mobile_dupire_localvol_surface = DupireLocalVolSurface(stock_code="941 HK").vol_surface
 
     constant_vol_surfaces = [tencent_constvol_surface, hsbc_constvol_surface, mobile_constvol_surface]
     implied_vol_surfaces = [tencent_impliedvol_surface, hsbc_impliedvol_surface, mobile_impliedvol_surface]
@@ -173,8 +173,3 @@ if __name__ == '__main__':
     run_pricer("Note Price vs PR", constant_vol_surfaces)
     run_pricer("Note Price vs PR", implied_vol_surfaces)
     run_pricer("Note Price vs PR", dupire_local_vol_surfaces)
-
-
-   
-
-

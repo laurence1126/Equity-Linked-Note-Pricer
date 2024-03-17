@@ -38,7 +38,7 @@ def calc_implied_total_vol(price: float, isCall: bool, F: float, y: float) -> fl
 
 def calc_implied_vol_curve(stock_code: Literal["700 HK", "5 HK", "941 HK"], day: int, log_forward_moneyness: float | np.ndarray):
     # Read option data from excel
-    option_chains = pd.read_excel("option_chains.xlsx", index_col=False)
+    option_chains = pd.read_excel("data/option_chains.xlsx", index_col=False)
     option_chains = option_chains[(option_chains["stock_code"] == stock_code) & (option_chains["biz_days_to_maturity"] == day)]
 
     # Calculate basic parameters
