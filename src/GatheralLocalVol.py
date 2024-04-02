@@ -129,7 +129,8 @@ def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], moneyne
 def gen_local_vol_surface(stock_code: Literal["700 HK", "5 HK", "941 HK"]):
     moneyness = np.arange(0.85, 1.15, 1e-3)
     T = np.arange(0, 0.5, 1 / 252)
-    return np.nan_to_num(local_vol_transform(stock_code, moneyness, T), nan=0)
+    return local_vol_transform(stock_code, moneyness, T)
+    # return np.nan_to_num(local_vol_transform(stock_code, moneyness, T), nan=0)
 
 
 if __name__ == "__main__":

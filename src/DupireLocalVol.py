@@ -11,12 +11,7 @@ import warnings
 from Curves import dividend_yield_curve, forward_rate_curve, yield_curve_interpolate
 from scipy.optimize import curve_fit
 
-
 warnings.filterwarnings("ignore")
-pd.set_option("display.max_rows", None)
-pd.set_option("display.max_columns", None)
-pd.set_option("display.expand_frame_repr", False)
-pd.set_option("display.max_colwidth", 1000)
 
 
 class DupireLocalVolSurface:
@@ -108,6 +103,16 @@ class DupireLocalVolSurface:
 
 
 if __name__ == "__main__":
-    vol_surface = DupireLocalVolSurface(stock_code="700 HK").vol_surface
-    vol_surface = DupireLocalVolSurface(stock_code="5 HK").vol_surface
-    vol_surface = DupireLocalVolSurface(stock_code="941 HK").vol_surface
+    moneyness = np.arange(0.7, 1.3, 1e-3)
+    T = np.arange(0, 0.5, 1 / 252)
+    fig, axs = plt.subplots(1, 3, subplot_kw=dict(projection="3d"), figsize=(15, 5))
+    for i, stock_code in enumerate(["700 HK", "5 HK", "941 HK"]):
+        x, y = np.meshgrid(moneyness, T)
+        axs[i].plot_surface(x, y, DupireLocalVolSurface(stock_code).vol_surface, cmap="plasma", edgecolor="none")
+        axs[i].set_title(stock_code)
+        axs[i].set_xlabel("Moneyness")
+        axs[i].set_ylabel("Time to Maturity")
+        axs[i].set_zlabel("Volatility")
+    fig.suptitle(f"Dupire Local Vol", fontsize=16, fontweight="bold")
+    plt.subplots_adjust(left=0, right=1)
+    plt.show()
