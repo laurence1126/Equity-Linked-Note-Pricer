@@ -209,3 +209,87 @@ def local_vol_transform(stock_code: Literal["700 HK", "5 HK", "941 HK"], moneyne
 Plots for combining the local volatility surface with the Black-Scholes implied volatility surface:
 
 ![local_vs_implied](img/local_vs_implied_combined.png)
+
+### Local Vol Surface (Dupire Methods)
+
+In this part, we use stock 700 HK as an example for illustration purposes. The process for stocks 5 HK and 941 HK is identical.
+
+#### Step 1: Calcualte $\partial C / \partial T$ and $\partial^2 C / \partial K^2$
+
+We first utilize Cubic Spline to obtain a smooth curve that represents the relationship between option prices and time to maturity for each strike. Totally we got 25 cubic splines, each corresponding to a different strike price, as our dataset covers the information of 25 different strike prices.
+
+```python
+def cubic_splines_of_option_price_with_respect_to_maturity(self, strike: float) -> (CubicSpline, CubicSpline):
+    df = self.total_df.query(f"strike == {strike} ").copy()
+    cs_call = CubicSpline(df['time_to_maturity'], df['call_price'])
+    cs_put = CubicSpline(df['time_to_maturity'], df['put_price'])
+    return cs_call, cs_put
+```
+
+Then we utilize Cubic Spline to obtain a smooth curve that represents the relationship between option prices and strike for each expire date. Totally we got 5 cubic splines, each corresponding to a different expire date, as our dataset covers the information of 5 different expire dates
+
+```python
+def cubic_splines_of_option_price_with_respect_to_strike(self, expire_date: datetime) -> (CubicSpline, CubicSpline):
+    df = self.total_df.query(f"expire_date == '{expire_date.strftime('%Y-%m-%d')}'").copy()
+    cs_call = CubicSpline(df['strike'], df['call_price'])
+    cs_put = CubicSpline(df['strike'], df['put_price'])
+    return cs_call, cs_put
+```
+
+![option_price](img/Option_Price.png)
+
+#### Step 2: Calculate Local Vol by Dupire's Formula
+
+Using the aforementioned set of 25 cubic splines representing option prices against time to maturity, as well as an additional set of 5 cubic splines representing option prices against strike, we can calculate a total of 25x5 local volatility points. This is achieved by taking numerical derivatives of the cubic splines and subsequently applying the Dupire's Formula:
+
+$$\sigma^2 =  \frac{2 \times \partial C / \partial T}{K^2 \times \partial^2 C / \partial K^2}$$
+
+For the points that moneyness < 1, we use the local vol calculated by put options; for the points that moneyness > 1, we use the local vol calculated by call options.
+
+When the strike is extremely high or low, or the expiration date is either too close or too far, the value $\partial C$ and $\partial^2 C$ become very small. Consequently, there is a possibility of error in the numerical derivative calculations for $\partial C / \partial T$ and $\partial^2 C / \partial K^2$, which may result in negative or excessively large local volatility values. To address this issue, we disregard any calculated $\sigma^2$ values that are below 0 or above 0.25, ensuring that the local volatility remains within a reasonable range.
+
+```python
+def local_vol_calc(self, strike: float, expire_date: datetime) -> float:
+	  df = self.total_df.query(f"strike == {strike} and "
+	                           f"expire_date == '{expire_date.strftime('%Y-%m-%d')}'").copy()
+	  time_to_maturity = df['time_to_maturity'].iloc[0]
+	  moneyness = df['moneyness'].iloc[0]
+	  i = 0 if moneyness > 1 else 1
+	  dc_dt = derivative(self.cubic_splines_of_option_price_with_respect_to_maturity(strike)[i], time_to_maturity,
+	                     dx=0.01 * time_to_maturity, n=1)
+	  d2c_dk2 = derivative(self.cubic_splines_of_option_price_with_respect_to_strike(expire_date)[i], strike,
+	                       dx=0.05 * strike, n=2)
+	  local_vol = 2 * dc_dt / strike ** 2 / d2c_dk2
+	  return local_vol
+```
+
+![700_vol_point](img/700_vol_point.png)
+
+#### Step 3: Regression Along Moneyness
+
+We perform a regression of the local volatility against the forward moneyness. The regression formula we use is as follows:
+
+$$\sigma(x)^2 = \sigma_{atm}^2 + \delta(tanh(\kappa x)/ \kappa) + \frac{\gamma}{2}(tanh(\kappa x)/\kappa)^2$$
+
+Here, x represents $ln(K/F)$, where K is the strike price and F is the forward price. Through this regression process, we obtain a total of 5 regression formulas, each corresponding to a different expiration date.
+
+Then we compute the corresponding $\sigma(T, S)^2$ by $\sigma(T, F)^2$.
+
+![moneyness_local_vol](img/moneyness_local_vol.png)
+
+#### Step 4: Interpolate Along Time to Maturity
+
+Finally we calculate the local volatility for each expiration date by plugging in a fixed moneyness value into the regression formula. These local volatility values are then connected using cubic spline interpolation to create a smooth curve representing local volatility vs. time to maturity. By repeating this process for a series of moneyness values, we construct the entire local volatility surface.
+
+```python
+# each row represents a series of local vol of different moneyness of a certain time to maturity.
+[[0.14568768 0.14579082 0.1458931  ... 0.12376127 0.12363468 0.123508  ]
+ [0.14037627 0.14042578 0.14047488 ... 0.12979407 0.12973336 0.1296726 ]
+ [0.1352829  0.1352829  0.1352829  ... 0.13528143 0.13528148 0.13528153]
+ ...
+ [0.04834877 0.04856959 0.04879108 ... 0.0779764  0.07765942 0.07734436]
+ [0.04593338 0.04615839 0.04638408 ... 0.0767657  0.07644707 0.07613039]
+ [0.0435324  0.04376132 0.04399092 ... 0.07558514 0.07526563 0.07494808]]
+```
+
+![dupire_combined](img/Dupire_Local_Vol.png)
