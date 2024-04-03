@@ -210,7 +210,7 @@ Plots for combining the local volatility surface with the Black-Scholes implied 
 
 ![local_vs_implied](img/local_vs_implied_combined.png)
 
-### Local Vol Surface (Dupire Methods)
+### Local Vol Surface (Dupire's Methods)
 
 In this part, we use stock 700 HK as an example for illustration purposes. The process for stocks 5 HK and 941 HK is identical.
 
@@ -293,3 +293,104 @@ Finally we calculate the local volatility for each expiration date by plugging i
 ```
 
 ![dupire_combined](img/Dupire_Local_Vol.png)
+
+## 3. Determine the Price with Monte Carlo Simulation
+
+### Get Correlated Standard Normal Matrix
+
+Download stock price correlation matrix from Bloomberg.
+
+Utilizing the stock price correlation matrix, calculate the Cholesky factor. Then, employ the Cholesky factor to multiply a randomly generated standard normal matrix, resulting in a correlated standard normal matrix. Each simulation path will utilize a 3x126 correlated standard normal matrix for stock price simulation. Store all the correlated standard normal matrices for each path in the variable `corr_norm`.
+
+```python
+def get_corr_norm(n, m, path, corr_matrix):
+    rand_norm = np.random.standard_normal((n, m, path))
+    corr_norm = np.zeros((n, m, path))
+    for i in range(path):
+        # Get Cholesky factor of Correlation matrix
+        cho_factor = np.linalg.cholesky(corr_matrix)
+        # Get correlated normal matrix
+        for j in range(m):
+            corr_norm[:, j, i] = np.dot(cho_factor, rand_norm[:, j, i])
+    return corr_norm
+```
+
+### Stock Price Simulation
+
+To obtain twice the number of paths for stock price, the technique of antithetic variate Monte Carlo Simulation is employed. This involves simulating the stock price using the initial stock price, the stock index (which determines the corresponding row in the correlated standard normal matrix), the correlated standard normal matrix itself, the number of steps, the stock name, and a distinct volatility surface.
+
+To conduct the simulation, the closing price of 2023/11/24 is utilized as the initial price. The risk-free rate is determined by the forward rate corresponding to the respective date. The dividend yield is calculated using the rate obtained from the dividend yield curve. The output of the simulation is a stock price matrix for a single stock, generated over a simulation with twice the number of paths. The resulting matrix has 20,000 rows and 126 columns.
+
+Below shows the first 50 paths simulation for each stock:
+
+![paths_combined](img/paths_combined.png)
+
+### Find the Laggard and Determine the Note Payoff Scenario:
+
+In each simulated path, the stock price of three selected stocks is generated with correlation. By comparing the ratio of the last price to the initial price for each stock, the stock with the lowest ratio is identified as the laggard stock.
+
+def get_last_price(i, tencent, hsbc, mobile, m):
+return {"700 HK": tencent[i, m - 1], "5 HK": hsbc[i, m - 1], "941 HK": mobile[i, m - 1]}
+
+```python
+def find_laggard(last_price, initial_price):
+    if last_price.get("700 HK") / initial_price.get("700 HK") < last_price.get("5 HK") / initial_price.get("5 HK"):
+        if last_price.get("700 HK") / initial_price.get("700 HK") < last_price.get("941 HK") / initial_price.get(
+                "941 HK"):
+            return "700 HK"
+        else:
+            return "941 HK"
+    if last_price.get("700 HK") / initial_price.get("700 HK") > last_price.get("5 HK") / initial_price.get("5 HK"):
+        if last_price.get("700 HK") / initial_price.get("700 HK") > last_price.get("941 HK") / initial_price.get(
+                "941 HK"):
+            return "941 HK"
+        else:
+            return "5 HK"
+```
+
+The scenario of Note redemption is determined based on the comparison between the last price and initial price of the laggard stock. By using the laggard stock's last price and initial price, the corresponding redemption amount is returned.
+
+```python
+def decide_scenario(name, last_price, initial_price):
+    match name:
+        case "700 HK":
+            if last_price.get("700 HK") >= initial_price.get("700 HK"):
+                return "700 HK", 1
+            else:
+                return "700 HK", 2
+        case "5 HK":
+            if last_price.get("5 HK") >= initial_price.get("5 HK"):
+                return "5 HK", 1
+            else:
+                return "5 HK", 2
+        case "941 HK":
+            if last_price.get("941 HK") >= initial_price.get("941 HK"):
+                return "941 HK", 1
+            else:
+                return "941 HK", 2
+
+
+def redeem(scenario, pr, last_price, initial_price, name):
+    match scenario:
+        case 1:
+            return 10000 * (1 + pr * (last_price.get(name) / initial_price.get(name) - 1))
+        case 2:
+            return 10000 * max(0.9, last_price.get(name) / initial_price.get(name))
+```
+
+To calculate the Note redemption for each path, a specific PR (Probability of Redemption) is utilized. This process is repeated 10,000 times to obtain the mean value of the Note redemption using the specific PR. The `Scipy.optimize.minimize_scalar` function is then employed to find the PR value that results in a redemption amount that is 98% of the Note denomination.
+
+```python
+def get_note_price(path, tencent, hsbc, mobile, initial_price, pr, m):
+    summation = 0
+    for i in range(int(2 * path)):
+        LAST_PRICE = get_last_price(i, tencent, hsbc, mobile, m)
+        LAGGARD = find_laggard(LAST_PRICE, initial_price)
+        SCENARIO = decide_scenario(LAGGARD, LAST_PRICE, initial_price)
+        summation = summation + redeem(SCENARIO[1], pr, LAST_PRICE, initial_price, SCENARIO[0])
+    return 1 / (2 * path) * summation
+```
+
+Finally we display the graph depicting the relationship between note price and PR. The graph exhibits a generally upward linear trend with some fluctuations. From the graph, we can identify the PR value at which the note price reaches 98% of the issue price. Additionally, we present the note price against PR using various volatility surfaces, including the `constant volatility surface` (fig 1), `implied volatility surface` (fig 2), and `Dupire volatility surface` (fig 3).
+
+![price_diff_vol](img/price_diff_vol.png)
