@@ -14,8 +14,7 @@ Then we use the **Cubic Spline** method to interpolate between discreet points:
 
 ```python
 def yield_curve_interpolate() -> np.array:
-    basic_curve = [i / 100 for i in [5.07048, 5.28202, 5.28649, 5.37941,
-																		 5.58012, 5.64167, 5.61137, 5.58054]]
+    basic_curve = [i / 100 for i in [5.07048, 5.28202, 5.28649, 5.37941, 5.58012, 5.64167, 5.61137, 5.58054]]
     basic_time = [1 / 252, 5 / 252, 15 / 252, 1 / 12, 2 / 12, 3 / 12, 6 / 12, 1]
     cs = CubicSpline(basic_time, basic_curve)
     ts = np.arange(0, 1, 1 / 252)
@@ -168,7 +167,7 @@ $$v_L = \frac{\frac{\partial w}{\partial T}}{1-\frac{y}{w}\frac{\partial w}{\par
 
 Here we also transform the input moneyness $m$ to forward log-moneyness $y$ to fit the equation above. The partial derivatives $\frac{\partial w}{\partial y}$, $\frac{\partial^2 w}{\partial y^2}$, and $\frac{\partial w}{\partial T}$ are calculated via numerical differentiation method through Python packages.
 
-Due to the fact that we fitted the Black-Scholes implied volatility surface with z-axis as $\sigma^2_{BS}$ before, we need to multiply the matrix of surface $\sigma^2_{BS}(y, T)_{(300 \times 126)}$ by $diag(T)_{(126 \times 126)}$ via:
+Due to the fact that we fitted the Black-Scholes implied volatility surface with z-axis as $\sigma^2_{BS}$ before, we need to multiply the matrix of surface $\sigma^2_{BS}(y, T)_{(300  126)}$ by $diag(T)_{(126 \times 126)}$ via:
 
 $$
 w(y, T) =
