@@ -21,6 +21,10 @@ def yield_curve_interpolate() -> np.array:
     return np.array(cs(ts))
 ```
 
+<p align="center">
+  <img src="img/Yield_Curve.png">
+</p>
+
 ![yield_curve](img/Yield_Curve.png)
 
 ### Forward Rate Curve
