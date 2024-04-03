@@ -25,7 +25,7 @@ def yield_curve_interpolate() -> np.array:
 
 ### Forward Rate Curve
 
-In order to simulate stock trajectories, we need to know 1-Day forward rate at each time point. They are calculated as follows: $r_{t, t+1} = \frac{Y_{t+1}\cdot(t+\Delta t) - Y_t\cdot t}{\Delta t}$, With Python implementation:
+In order to simulate stock trajectories, we need to know 1-Day forward rate at each time point. They are calculated as follows: $r_{t, t+1} = \frac{Y_{t+1}\cdot(t+\Delta t) - Y_t\cdot t}{\Delta t}$, with Python implementation:
 
 ```python
 def forward_rate_curve(yield_curve: np.array) -> np.array:
@@ -167,7 +167,7 @@ $$v_L = \frac{\frac{\partial w}{\partial T}}{1-\frac{y}{w}\frac{\partial w}{\par
 
 Here we also transform the input moneyness $m$ to forward log-moneyness $y$ to fit the equation above. The partial derivatives $\frac{\partial w}{\partial y}$, $\frac{\partial^2 w}{\partial y^2}$, and $\frac{\partial w}{\partial T}$ are calculated via numerical differentiation method through Python packages.
 
-Due to the fact that we fitted the Black-Scholes implied volatility surface with z-axis as $\sigma^2_{BS}$ before, we need to multiply the matrix of surface ${\sigma^2_{BS}(y, T)}_{(300 \times 126)}$ by ${diag(T)}_{(126 \times 126)}$ via:
+Due to the fact that we fitted the Black-Scholes implied volatility surface with z-axis as $\sigma^2_{BS}$ before, we need to multiply the matrix of surface $\sigma^2_{BS}(y, T)$ by $diag(T)$ via:
 
 $$
 w(y, T) =
