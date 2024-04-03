@@ -6,9 +6,13 @@
 
 We collected HIBOR Rate (11/24/2023) under different maturity as risk free rate. The source data is:
 
+<div align="center">
+
 |   1D    |   1W    |   15D   |   1M    |   2M    |   3M    |   6M    |   1Y    |
 | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: | :-----: |
 | 5.07048 | 5.28202 | 5.28649 | 5.37941 | 5.58012 | 5.64167 | 5.61137 | 5.58054 |
+
+</div>
 
 Then we use the **Cubic Spline** method to interpolate between discreet points:
 
@@ -25,8 +29,6 @@ def yield_curve_interpolate() -> np.array:
   <img src="img/Yield_Curve.png">
 </p>
 
-![yield_curve](img/Yield_Curve.png)
-
 ### Forward Rate Curve
 
 In order to simulate stock trajectories, we need to know 1-Day forward rate at each time point. They are calculated as follows: $r_{t, t+1} = \frac{Y_{t+1}\cdot(t+\Delta t) - Y_t\cdot t}{\Delta t}$, with Python implementation:
@@ -42,7 +44,9 @@ def forward_rate_curve(yield_curve: np.array) -> np.array:
 
 ```
 
-![forward_curve](img/Forward_Rate_Curve.png)
+<p align="center">
+  <img src="img/Forward_Rate_Curve.png">
+</p>
 
 ### Dividend Curves
 
@@ -266,7 +270,9 @@ def local_vol_calc(self, strike: float, expire_date: datetime) -> float:
 	  return local_vol
 ```
 
-![700_vol_point](img/700_vol_point.png)
+<p align="center">
+  <img src="img/700_vol_point.png">
+</p>
 
 #### Step 3: Regression Along Moneyness
 
@@ -278,7 +284,9 @@ Here, x represents $ln(K/F)$, where K is the strike price and F is the forward p
 
 Then we compute the corresponding $\sigma(T, S)^2$ by $\sigma(T, F)^2$.
 
-![moneyness_local_vol](img/moneyness_local_vol.png)
+<p align="center">
+  <img src="img/moneyness_local_vol.png">
+</p>
 
 #### Step 4: Interpolate Along Time to Maturity
 
