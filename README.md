@@ -41,7 +41,6 @@ def forward_rate_curve(yield_curve: np.array) -> np.array:
     for i in range(len(ts) - 1):
         forward_rate_curve[i] = (yield_curve[i+1]*ts[i+1]-yield_curve[i]*ts[i])/dt
     return np.array(forward_rate_curve)
-
 ```
 
 <p align="center">
@@ -142,7 +141,7 @@ Sample fitting curves:
 
 Finally we fit the Black-Scholes implied volatility surface across data from available maturities (23, 46, 67, 87, 153 days) using Cubic Spline. We also transform the input from forward log-moneyness ($y = \log(\frac{K}{F_T})$) to moneyness ($m = \frac{K}{S_0}$) by the following equation: $y = \log(m) - \int_0^T\big(r(t) - q(t)\big)dt$, With Python implementation:
 
-````python
+```python
 def calc_forward_implied_vol_surface(
     stock_code: Literal["700 HK", "5 HK", "941 HK"], moneyness: float | np.ndarray, T: float | np.ndarray
 ) -> float | np.ndarray:
@@ -158,8 +157,7 @@ def calc_forward_implied_vol_surface(
         implied_vol_curve_list.append(calc_implied_vol_curve(stock_code, day, log_forward_moneyness))
     cs = CubicSpline(np.array(day_list) / 252, implied_vol_curve_list)
     return cs(T)
-    ```
-````
+```
 
 Corresponding Black-Scholes implied volatility surface for different stocks:
 
