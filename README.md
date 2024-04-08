@@ -88,12 +88,19 @@ We collected the Nov, Dec, Jan, Feb, Mar, and Jun option prices of each stocks w
 
 1. Define the Black-Scholes implied total variance $w$ by: $w = \sigma^2_{BS} \cdot T$
 2. Define the forward log-moneyness $y$ by: $y = \log(\frac{K}{F_T})$
-3. Therefore, the Black-Scholes formula for vanilla European options becomes: $C = F_T[N(d_1)-e^yN(d_2)], \qquad P = F_T[e^yN(-d_2) - N(-d_1)]$, where $d_1 = -\frac{y}{\sqrt{w}} + \frac{\sqrt{w}}{2}, \qquad d_2 = d_1-\sqrt{w}$
+3. Therefore, the Black-Scholes formula for vanilla European options becomes:
+   $$
+   \begin{aligned}C &= F_T[N(d_1)-e^y N(d_2)] \\
+       P &= F_T[e^y N(-d_2) - N(-d_1)]
+   \end{aligned}
+   $$
+   where $d_1 = -\frac{y}{\sqrt{w}} + \frac{\sqrt{w}}{2} \text{, and } d_2 = d_1-\sqrt{w}$
 4. Finally we acquire the Black-Scholes implied volatility by solving the equation $C_{BS}(\sigma^2_{BS})=price$ or $P_{BS}(\sigma^2_{BS})=price$ (from the market) depending on the sign of forward log-moneyness using Newton-Raphson method.
 
 #### Step 2: Regression Volatility Against Forward Log-moneyness
 
-1. After calculating desecrate volatility points, we fit the curve of different forward log-moneyness $y$ at the same maturity $T$ by the model: $\sigma^2_{y} = \sigma^2_{atm} + \delta\big(\frac{\tanh(\kappa y)}{\kappa}\big) + \frac{\gamma}{2}\big(\frac{\tanh(\kappa y)}{\kappa}\big)^2 + \epsilon$
+1. After calculating desecrate volatility points, we fit the curve of different forward log-moneyness $y$ at the same maturity $T$ by the model:
+   $$\sigma^2_{y} = \sigma^2_{atm} + \delta\big(\frac{\tanh(\kappa y)}{\kappa}\big) + \frac{\gamma}{2}\big(\frac{\tanh(\kappa y)}{\kappa}\big)^2 + \epsilon$$
 2. We calibrate the parameters by minimising the objective function: $RSS = \sum(\sigma^2_{y} - \hat{\sigma_{y}^2})^2$, with Python implementation:
 
 ```python
