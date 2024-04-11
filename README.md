@@ -92,7 +92,7 @@ We collected the Nov, Dec, Jan, Feb, Mar, and Jun option prices of each stocks w
    $$C = F_T[N(d_1)-e^y N(d_2)]$$
    $$P = F_T[e^y N(-d_2) - N(-d_1)]$$
    where $d_1 = -\frac{y}{\sqrt{w}} + \frac{\sqrt{w}}{2} \text{, and } d_2 = d_1-\sqrt{w}$
-5. Finally we acquire the Black-Scholes implied volatility by solving the equation $C_{BS}(\sigma^2_{BS})=price$ or $P_{BS}(\sigma^2_{BS})=price$ (from the market) depending on the sign of forward log-moneyness using Newton-Raphson method.
+4. Finally we acquire the Black-Scholes implied volatility by solving the equation $C_{BS}(\sigma^2_{BS})=price$ or $P_{BS}(\sigma^2_{BS})=price$ (from the market) depending on the sign of forward log-moneyness using Newton-Raphson method.
 
 #### Step 2: Regression Volatility Against Forward Log-moneyness
 
@@ -342,8 +342,10 @@ Below shows the first 50 paths simulation for each stock:
 
 In each simulated path, the stock price of three selected stocks is generated with correlation. By comparing the ratio of the last price to the initial price for each stock, the stock with the lowest ratio is identified as the laggard stock.
 
+```python
 def get_last_price(i, tencent, hsbc, mobile, m):
 return {"700 HK": tencent[i, m - 1], "5 HK": hsbc[i, m - 1], "941 HK": mobile[i, m - 1]}
+```
 
 ```python
 def find_laggard(last_price, initial_price):
@@ -404,6 +406,6 @@ def get_note_price(path, tencent, hsbc, mobile, initial_price, pr, m):
     return 1 / (2 * path) * summation
 ```
 
-Finally we display the graph depicting the relationship between note price and PR. The graph exhibits a generally upward linear trend with some fluctuations. From the graph, we can identify the PR value at which the note price reaches 98% of the issue price. Additionally, we present the note price against PR using various volatility surfaces, including the `constant volatility surface` (fig 1), `implied volatility surface` (fig 2), and `Dupire volatility surface` (fig 3).
+Finally we display the graph depicting the relationship between note price and PR. The graph exhibits a generally upward linear trend with some fluctuations. From the graph, we can identify the PR value at which the note price reaches 98% of the issue price. Additionally, we present the note price against PR using various volatility surfaces, including the **_constant volatility surface_** (fig 1), **_implied volatility surface_** (fig 2), and **_Dupire volatility surface_** (fig 3).
 
 ![price_diff_vol](img/price_diff_vol.png)
