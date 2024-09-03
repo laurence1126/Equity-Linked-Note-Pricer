@@ -249,9 +249,11 @@ def cubic_splines_of_option_price_with_respect_to_strike(self, expire_date: date
 
 #### Step 2: Calculate Local Vol by Dupire's Formula
 
-Using the aforementioned set of 25 cubic splines representing option prices against time to maturity, as well as an additional set of 5 cubic splines representing option prices against strike, we can calculate a total of 25x5 local volatility points. This is achieved by taking numerical derivatives of the cubic splines and subsequently applying the Dupire's Formula:
+Using the aforementioned set of 25 cubic splines representing option prices against time to maturity, as well as an additional set of 5 cubic splines representing option prices against strike, we can calculate a total of 25x5 local volatility points. This is achieved by taking numerical derivatives of the cubic splines and subsequently applying the Dupire's Formula when the option prices expresed as a function of the forward price:
 
-$$\sigma^2 =  \frac{2 \times \partial C / \partial T}{K^2 \times \partial^2 C / \partial K^2}$$
+```math
+\sigma^2_L = \frac{\frac{\partial C}{\partial T}}{\frac{1}{2} K^2 \cdot \frac{\partial^2 C}{\partial K^2}}
+```
 
 For the points that moneyness < 1, we use the local vol calculated by put options; for the points that moneyness > 1, we use the local vol calculated by call options.
 
